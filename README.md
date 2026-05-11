@@ -1,5 +1,13 @@
 # LongMemEval-V2
 
+
+<p align="center">
+  <a href="https://xiaowu0162.github.io/longmemeval-v2/"><img src="https://img.shields.io/badge/🌐-Website-2a75d0?style=flat-square" height="23"></a>
+  <a href="https://arxiv.org/pdf/2410.10813.pdf"><img src="https://img.shields.io/badge/📝-Paper-d03c36?style=flat-square" height="23"></a>
+  <a href="https://huggingface.co/datasets/xiaowu0162/longmemeval-v2" ><img src="https://img.shields.io/badge/🤗-Data-167f5f?style=flat-square" height="23"></a>
+  <a href="https://xiaowu0162.github.io/longmemeval-v2/#leaderboard" ><img src="https://img.shields.io/badge/🏆-Leaderboard-d89216?style=flat-square" height="23"></a>
+</p>
+
 **LongMemEval-V2: Evaluating Long-Term Agent Memory Toward Experienced Colleagues**
 
 [Di Wu](https://xiaowu0162.github.io/),
@@ -10,10 +18,7 @@
 [Nanyun Peng](https://vnpeng.net/), and
 [Kai-Wei Chang](https://kwchang.net/)
 
-[Website](https://xiaowu0162.github.io/longmemeval-v2/) |
-[Paper (temporary)](https://github.com/xiaowu0162/LongMemEval) |
-[Data](https://huggingface.co/datasets/xiaowu0162/longmemeval-v2) |
-[Leaderboard](https://xiaowu0162.github.io/longmemeval-v2/#leaderboard)
+
 
 This is the official LongMemEval-V2 repository. It contains the public
 evaluation harness, data preparation tools, leaderboard packaging utilities,
@@ -59,7 +64,7 @@ leaderboard/          metric merging, LAFS scoring, and submission packaging
 memory_modules/       memory backend implementations
 ```
 
-The repository includes the following evaluation methods:
+The repository implements the following memory modules:
 
 - `no_retrieval`: no memory context.
 - `rag_query_to_slice`: RAG query to raw state slices.
@@ -69,10 +74,7 @@ The repository includes the following evaluation methods:
 - `codex`: vanilla Codex coding-agent memory baseline.
 - `agentrunbook_c`: AgentRunbook-C.
 
-Benchmark curation scripts, annotation tools, ablations, and exploratory
-experiments are not part of this public release.
-
-## Setup
+## Setup: Environment
 
 LongMemEval-V2 uses Python 3.11. The default conda environment installs
 PyTorch through `requirements-torch.txt`. For CUDA 12.4 machines, the torch
@@ -98,13 +100,12 @@ PyTorch build first, either with a direct `pip install` command or by editing
 The environment does not include vLLM. Start or forward your own
 OpenAI-compatible model servers, then point the scripts to them. The paper runs
 use Qwen3.5-9B as the fixed reader and Qwen3-Embedding-8B for embedding-based
-methods. For `codex` and `agentrunbook_c`, install Codex v0.117.0 separately
+methods. For `codex` and `agentrunbook_c`, download Codex v0.117.0 separately
 and set `CODEX_BINARY`.
 
-## Data
+## Setup: Data
 
-Download the released dataset from Hugging Face and prepare the runtime
-screenshots layout:
+Download and prepare:
 
 ```bash
 python data/download_data.py --data-root data/longmemeval-v2
@@ -122,28 +123,29 @@ needed and links the resulting directories into:
 screenshots/<trajectory_id>/<step>.png
 ```
 
-## Model Endpoints
+## Setup: Model Endpoints and Software
 
 Example endpoint settings:
 
 ```bash
+# for all experiments
 export READER_BASE_URL=http://localhost:8023/v1
 export READER_MODEL=Qwen/Qwen3.5-9B
+
+# additionally for RAG and AgentRunbook-R
 export LME_CONTROLLER_BASE_URL=http://localhost:8023/v1
 export LME_CONTROLLER_MODEL=Qwen/Qwen3.5-9B
 export LME_EMBEDDING_BASE_URL=http://localhost:8114/v1
 export LME_EMBEDDING_MODEL=Qwen/Qwen3-Embedding-8B
 ```
 
-For LLM-judged abstention and gotchas questions:
+Set for LLM judge (default `gpt-5.2` with `medium` reasoning):
 
 ```bash
 export OPENAI_API_KEY=...
 ```
 
-The default judge is `gpt-5.2` with medium reasoning effort.
-
-For Codex-based runs:
+For Codex and AgentRunbook-C:
 
 ```bash
 export CODEX_BINARY=/path/to/codex-binary
@@ -153,43 +155,6 @@ export CODEX_REASONING_EFFORT=xhigh
 
 Codex also expects common command-line tools such as `rg` and `find`.
 
-## Quick Smoke Test
-
-Reader-only smoke run:
-
-```bash
-python evaluation/run_eval.py \
-  --data-root "$DATA_ROOT" \
-  --domain web \
-  --tier small \
-  --method no_retrieval \
-  --limit 1 \
-  --output-dir runs/smoke_no_retrieval_web_small
-```
-
-RAG smoke run:
-
-```bash
-python evaluation/run_eval.py \
-  --data-root "$DATA_ROOT" \
-  --domain web \
-  --tier small \
-  --method rag_query_to_slice \
-  --limit 1 \
-  --output-dir runs/smoke_rag_web_small
-```
-
-Expected outputs include:
-
-```text
-run_args.json
-prompt_rows.jsonl
-per_question.jsonl
-aggregated_metrics.json
-runtime_inputs/
-memory_workspace/
-```
-
 ## Reproducing Baselines
 
 Each shell script accepts extra argparse flags after the environment variables:
@@ -197,7 +162,6 @@ Each shell script accepts extra argparse flags after the environment variables:
 ```bash
 export DATA_ROOT=/path/to/longmemeval-v2
 export OUTPUT_ROOT=runs
-export DOMAIN=web
 export TIER=small
 
 evaluation/scripts/run_no_retrieval.sh
@@ -208,27 +172,11 @@ evaluation/scripts/run_codex.sh
 evaluation/scripts/run_agentrunbook_c.sh
 ```
 
-Change `DOMAIN=enterprise` and `TIER=medium` to run the other paper settings.
-The direct argparse form is:
+Each script runs both the web and enterprise domains for the selected tier, writing
+outputs such as `runs/no_retrieval_web_small` and
+`runs/no_retrieval_enterprise_small`. Set `TIER=medium` to run LME-V2-Medium.
 
-```bash
-python evaluation/run_eval.py \
-  --data-root "$DATA_ROOT" \
-  --domain web \
-  --tier small \
-  --method agentrunbook_r \
-  --output-dir runs/agentrunbook_r_web_small
-```
-
-## Metrics
-
-Each run writes `aggregated_metrics.json`. Category results are reported
-separately for regular and abstention questions, and
-`combined_abstention_by_category` reports the paper-facing average of
-`(static, static-abs)`, `(dynamic, dynamic-abs)`, and
-`(procedure, procedure-abs)`.
-
-To combine matching enterprise and web runs for the same method and tier:
+Each run writes `aggregated_metrics.json`. To combine matching enterprise and web runs for the same method and tier:
 
 ```bash
 python leaderboard/combine_aggregated_metrics.py \
@@ -237,10 +185,53 @@ python leaderboard/combine_aggregated_metrics.py \
   -o runs/agentrunbook_r_small_combined_metrics.json
 ```
 
-The combined file uses example-count-weighted scores, token means, and mean
-timing. Timing percentiles are not merged from aggregate-only files.
+## Implementing Your Method
 
-## Leaderboard Submissions
+Memory backends inherit from `memory_modules.memory.Memory`. For a minimal
+example, see `memory_modules/no_retrieval.py`; for indexed retrieval examples,
+see `memory_modules/rag.py` and `memory_modules/agentrunbook_r.py`.
+
+A backend should:
+
+- decorate the class with `@register_memory`;
+- set a unique `memory_type`;
+- implement `insert(self, trajectory)`, which receives each full trajectory
+  object selected for the current haystack;
+- implement `query(self, query, query_image=None)`, which receives the question
+  text and optional question screenshot path.
+
+`query` must return a list of memory context items:
+
+```python
+[
+    {"type": "text", "value": "retrieved notes or evidence"},
+    {"type": "image", "value": "/absolute/or/relative/path/to/image.png"},
+]
+```
+
+Text values must be non-empty strings. Image values must point to existing
+files. The harness appends these items to the reader prompt and enforces
+`--memory-context-max-tokens` before calling the answer model.
+
+During `query`, the backend can call `self.get_query_context()` to access
+`question_id`, `question_type`, and the raw question item. Optional hooks include
+`post_query_hook(...)` for per-query metadata and `_save_backend(...)` /
+`_load_backend(...)` for persisted memory state.
+
+To run a new backend directly, create a memory config JSON:
+
+```json
+{
+  "memory_type": "your_memory_type",
+  "memory_params": {}
+}
+```
+
+Then pass it to `evaluation/harness.py` with `--memory-config-path`. To expose
+the method through `evaluation/run_eval.py` and the shell wrappers, add the
+method name and config construction there as well.
+
+## Submitting to Leaderboard
 
 Leaderboard entries measure how much a memory system improves the released
 baseline + AgentRunbook accuracy-latency frontier. The score is LAFS gain over
@@ -250,26 +241,13 @@ operating points for the same method and tier.
 See [leaderboard/README.md](leaderboard/README.md) for the full packaging
 instructions.
 
-Submissions will be collected through a Google form. Please do not submit
-leaderboard entries as GitHub issues; informal submission issues will be
-closed or deleted.
-
-## Troubleshooting
-
-- Missing trajectory screenshots: run
-  `python data/prepare_data.py --data-root "$DATA_ROOT" --mode symlink`.
-- Endpoint connection failure: check `READER_BASE_URL`,
-  `LME_CONTROLLER_BASE_URL`, and `LME_EMBEDDING_BASE_URL`.
-- `top_k` rejected by the server: use a vLLM-compatible OpenAI endpoint or set
-  `--reader-top-k` / `--controller-top-k` according to your server support.
-- Codex binary not found: set `CODEX_BINARY` to the Codex v0.117.0 executable.
-- Existing output directory errors: use a new `--output-dir`; the harness
-  refuses to overwrite memory workspaces.
+Submit leaderboard packages through the
+[submission form](https://forms.gle/rxUpiuRKDERqpqSi9). Please do not submit
+leaderboard entries as GitHub issues. Informal submission issues will be closed
+or deleted.
 
 ## Citation
 
-Please use the following placeholder citation until the final preprint metadata
-is available:
 
 ```bibtex
 @article{wu2026longmemevalv2,

@@ -4,9 +4,10 @@ This folder contains utilities for preparing LongMemEval-V2 leaderboard
 packages. A leaderboard submission represents one memory method at one tier
 (`small` or `medium`) and may contain multiple latency operating points.
 
-Leaderboard entries are submitted through a Google form. Please do not submit
-leaderboard entries as GitHub issues; informal submission issues will be
-closed or deleted.
+Submit leaderboard packages through the
+[submission form](https://forms.gle/rxUpiuRKDERqpqSi9). Please do not submit
+leaderboard entries as GitHub issues; informal submission issues will be closed
+or deleted.
 
 ## What Gets Scored
 
@@ -167,14 +168,3 @@ python -m json.tool leaderboard/submissions/submission_1/submission_overview.jso
 The package should contain one `operating_points/<name>/` folder per latency
 operating point, plus `SYSTEM_DESCRIPTION.md`, the code file, and
 `submission_overview.json` at the root.
-
-## Troubleshooting
-
-- `Missing aggregated_metrics.json`: the run has not finished evaluation.
-- `model must contain 'qwen3.5-9b'`: rerun with the fixed reader model expected
-  by the leaderboard.
-- `evaluator_model must contain 'gpt-5.2'`: rerun with the fixed judge model.
-- `different question ids` or `different haystack`: rebuild the operating
-  points from the same tier and data split.
-- `Operating points use different methods`: pass the same `--method` value to
-  step 1 for all operating points.
