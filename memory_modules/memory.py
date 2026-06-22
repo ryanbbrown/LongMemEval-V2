@@ -221,3 +221,4 @@ from .codex import CodexMemory  # noqa: E402,F401
 from .agentrunbook_c import AgentRunbookC  # noqa: E402,F401
 from .agentrunbook_r import AgentRunbookR  # noqa: E402,F401
 from .rag import RagMemory  # noqa: E402,F401
+from .thinharness_memory import ThinHarnessMemory  # noqa: E402,F401

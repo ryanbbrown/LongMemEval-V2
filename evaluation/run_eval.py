@@ -25,10 +25,11 @@ METHODS = {
     "agentrunbook_r",
     "codex",
     "agentrunbook_c",
+    "thinharness",
 }
 
 
-def parse_question_ids(raw_values: list[str] | None) -> list[str] | None:
+def parse_csv_list(raw_values: list[str] | None) -> list[str] | None:
     if not raw_values:
         return None
     out: list[str] = []
@@ -40,6 +41,10 @@ def parse_question_ids(raw_values: list[str] | None) -> list[str] | None:
     return out or None
 
 
+def parse_question_ids(raw_values: list[str] | None) -> list[str] | None:
+    return parse_csv_list(raw_values)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run LongMemEval-V2 evaluation.")
     parser.add_argument("--data-root", required=True, help="Path to the downloaded LongMemEval-V2 dataset")
@@ -49,6 +54,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--limit", type=int, default=None, help="Run only the first N selected questions")
     parser.add_argument("--question-ids", nargs="*", default=None, help="Optional question ids, space or comma separated")
+    parser.add_argument("--save-memory", action="store_true", help="Save shared memory state after indexing")
+    parser.add_argument("--skip-evaluation", action="store_true", help="Build and save shared memory, then exit before prompt construction")
+    parser.add_argument("--load-memory-dir", default=None, help="Path to saved memory_state to load instead of rebuilding")
 
     parser.add_argument("--reader-model", default=os.getenv("READER_MODEL", "Qwen/Qwen3.5-9B"))
     parser.add_argument("--reader-base-url", default=os.getenv("READER_BASE_URL", "http://localhost:8023/v1"))
@@ -74,12 +82,39 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--embedding-api-key-env", default="OPENAI_API_KEY")
 
     parser.add_argument("--codex-binary", default=os.getenv("CODEX_BINARY", "codex"))
+    parser.add_argument(
+        "--codex-evidence-mode",
+        choices=["axtree", "image", "both"],
+        default=os.getenv("CODEX_EVIDENCE_MODE", "both"),
+        help="Evidence mode for codex/agentrunbook_c memory. Default both (text+image); use axtree for text-only.",
+    )
     parser.add_argument("--codex-model", default=os.getenv("CODEX_MODEL", "gpt-5.4-mini"))
     parser.add_argument("--codex-reasoning-effort", default=os.getenv("CODEX_REASONING_EFFORT", "xhigh"))
     parser.add_argument("--codex-timeout-seconds", type=float, default=float(os.getenv("CODEX_TIMEOUT_SECONDS", "1800")))
     parser.add_argument("--codex-max-retries", type=int, default=int(os.getenv("CODEX_MAX_RETRIES", "3")))
 
+    parser.add_argument("--thinharness-model", default=os.getenv("THINHARNESS_MODEL", "openai:gpt-5.4-mini"))
+    parser.add_argument("--thinharness-base-url", default=os.getenv("THINHARNESS_BASE_URL"))
+    parser.add_argument("--thinharness-api-key-env", default=os.getenv("THINHARNESS_API_KEY_ENV", "OPENAI_API_KEY"))
+    parser.add_argument("--thinharness-api-key-file", default=os.getenv("THINHARNESS_API_KEY_FILE"))
+    parser.add_argument("--thinharness-timeout-seconds", type=float, default=float(os.getenv("THINHARNESS_TIMEOUT_SECONDS", "1800")))
+    parser.add_argument("--thinharness-max-retries", type=int, default=int(os.getenv("THINHARNESS_MAX_RETRIES", "3")))
+    parser.add_argument("--thinharness-output-retries", type=int, default=int(os.getenv("THINHARNESS_OUTPUT_RETRIES", "1")))
+    parser.add_argument("--thinharness-tool-retries", type=int, default=int(os.getenv("THINHARNESS_TOOL_RETRIES", "2")))
+    parser.add_argument(
+        "--thinharness-reasoning-effort",
+        choices=["none", "minimal", "low", "medium", "high", "xhigh"],
+        default=os.getenv("THINHARNESS_REASONING_EFFORT", "low"),
+    )
+    parser.add_argument(
+        "--thinharness-tools",
+        nargs="*",
+        default=None,
+        help="ThinHarness builtin tools, space or comma separated. Defaults to read, search, jsonl_search, list, glob.",
+    )
+
     parser.add_argument("--evaluator-model", default=os.getenv("EVALUATOR_MODEL", "gpt-5.2"))
+    parser.add_argument("--evaluator-base-url", default=os.getenv("EVALUATOR_BASE_URL"))
     parser.add_argument("--evaluator-api-key-env", default=os.getenv("EVALUATOR_API_KEY_ENV", "OPENAI_API_KEY"))
     parser.add_argument("--evaluator-reasoning-effort", choices=["low", "medium", "high"], default="medium")
     parser.add_argument("--evaluator-max-completion-tokens", type=int, default=4096)
@@ -157,6 +192,25 @@ def build_memory_config(args: argparse.Namespace, data_root: Path) -> dict[str, 
                 },
             },
         }
+    if args.method == "thinharness":
+        tools = parse_csv_list(args.thinharness_tools) or ["read", "search", "jsonl_search", "list", "glob"]
+        return {
+            "memory_type": "thinharness",
+            "memory_params": {
+                "model": args.thinharness_model,
+                "base_url": args.thinharness_base_url,
+                "api_key_env": args.thinharness_api_key_env,
+                "api_key_file": args.thinharness_api_key_file,
+                "timeout_seconds": args.thinharness_timeout_seconds,
+                "max_retries": args.thinharness_max_retries,
+                "output_retries": args.thinharness_output_retries,
+                "tool_retries": args.thinharness_tool_retries,
+                "builtin_tools": tools,
+                "output_mode": "prompted",
+                "reasoning_effort": args.thinharness_reasoning_effort,
+                "extra_body": {},
+            },
+        }
     codex_params = {
         "binary": args.codex_binary,
         "model": args.codex_model,
@@ -171,7 +225,7 @@ def build_memory_config(args: argparse.Namespace, data_root: Path) -> dict[str, 
             "memory_type": "codex",
             "memory_params": {
                 "questions_path": str((data_root / "questions.jsonl").resolve()),
-                "evidence_mode": "both",
+                "evidence_mode": args.codex_evidence_mode,
                 "trajectory_pool_root": None,
                 "codex_params": codex_params,
             },
@@ -180,7 +234,7 @@ def build_memory_config(args: argparse.Namespace, data_root: Path) -> dict[str, 
         "memory_type": "agentrunbook_c",
         "memory_params": {
             "questions_path": str((data_root / "questions.jsonl").resolve()),
-            "evidence_mode": "both",
+            "evidence_mode": args.codex_evidence_mode,
             "trajectory_pool_root": None,
             "query_codex_params": codex_params,
         },
@@ -247,6 +301,8 @@ def main() -> None:
         str(args.prompt_build_max_workers),
         "--evaluator-model",
         args.evaluator_model,
+        "--evaluator-base-url",
+        args.evaluator_base_url or "",
         "--evaluator-api-key-env",
         args.evaluator_api_key_env,
         "--evaluator-reasoning-effort",
@@ -254,6 +310,12 @@ def main() -> None:
         "--evaluator-max-completion-tokens",
         str(args.evaluator_max_completion_tokens),
     ]
+    if args.save_memory:
+        harness_argv.append("--save-memory")
+    if args.skip_evaluation:
+        harness_argv.append("--skip-evaluation")
+    if args.load_memory_dir is not None:
+        harness_argv.extend(["--load-memory-dir", args.load_memory_dir])
     if not args.reader_enable_thinking:
         harness_argv.append("--reader-disable-thinking")
     if args.shuffle_questions_seed is not None:

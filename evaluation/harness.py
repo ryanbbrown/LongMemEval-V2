@@ -59,6 +59,7 @@ COMBINED_ABSTENTION_CATEGORY_PAIRS = {
 }
 LLM_EVAL_FUNCTIONS = {"llm_abstention_checker", "llm_gotchas_checker"}
 OPENAI_MAX_RETRIES = 10
+READER_RESPONSE_PARSE_MAX_ATTEMPTS = 3
 MEMORY_CONTEXT_PROCESSOR_LOCAL = threading.local()
 NONSHARED_PARALLEL_MEMORY_TYPES = {
     "codex",
@@ -273,6 +274,7 @@ def inject_runtime_memory_params(
         "agentrunbook_r",
         "codex",
         "agentrunbook_c",
+        "thinharness",
     }:
         return runtime_config
 
@@ -280,7 +282,7 @@ def inject_runtime_memory_params(
     runtime_config["memory_params"]["trajectories_root_dir"] = str(
         Path(trajectories_path).resolve().parent
     )
-    if runtime_config["memory_type"] in {"codex", "agentrunbook_c"} and query_trace_dir is not None:
+    if runtime_config["memory_type"] in {"codex", "agentrunbook_c", "thinharness"} and query_trace_dir is not None:
         runtime_config["memory_params"]["query_trace_dir"] = str(query_trace_dir.resolve())
     if runtime_config["memory_type"] == "agent_runbook":
         generation_params_obj = runtime_config["memory_params"].get("generation_params", {})
@@ -341,6 +343,16 @@ def get_memory_context_processor() -> Any:
     return processor
 
 
+def get_memory_context_tokenizer() -> Any:
+    from transformers import AutoTokenizer
+
+    tokenizer = getattr(MEMORY_CONTEXT_PROCESSOR_LOCAL, "tokenizer", None)
+    if tokenizer is None:
+        tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3.5-9B")
+        MEMORY_CONTEXT_PROCESSOR_LOCAL.tokenizer = tokenizer
+    return tokenizer
+
+
 def load_memory_context_images(memory_context: list[MemoryContextItem]) -> list[Any | None]:
     from PIL import Image
 
@@ -365,7 +377,6 @@ def count_memory_context_tokens(
     if not memory_context:
         return 0
 
-    processor = get_memory_context_processor()
     content_parts: list[dict[str, str]] = []
     images: list[Any] = []
     for item, loaded_image in zip(memory_context, loaded_images):
@@ -376,6 +387,12 @@ def count_memory_context_tokens(
         content_parts.append({"type": "image"})
         images.append(loaded_image)
 
+    if not images:
+        tokenizer = get_memory_context_tokenizer()
+        prompt_text = "\n".join(part["text"] for part in content_parts)
+        return len(tokenizer.encode(prompt_text))
+
+    processor = get_memory_context_processor()
     prompt_text = processor.apply_chat_template(
         [{"role": "user", "content": content_parts}],
         tokenize=False,
@@ -830,7 +847,7 @@ def extract_text_from_response_message(message: Any) -> str:
 
 def build_extra_body(args: argparse.Namespace) -> dict[str, Any] | None:
     extra_body: dict[str, Any] = {}
-    if args.top_k is not None:
+    if args.top_k is not None and args.top_k > 0:
         extra_body["top_k"] = args.top_k
     if args.repetition_penalty is not None:
         extra_body["repetition_penalty"] = args.repetition_penalty
@@ -848,7 +865,7 @@ def build_reader_request(
         "messages": messages,
         "timeout": args.timeout_seconds,
     }
-    if args.base_url:
+    if args.base_url and args.base_url.rstrip("/") != "https://api.openai.com/v1":
         req["max_tokens"] = args.max_completion_tokens
     else:
         req["max_completion_tokens"] = args.max_completion_tokens
@@ -880,7 +897,18 @@ async def call_reader_model_async(
     args: argparse.Namespace,
     messages: list[dict[str, Any]],
 ) -> tuple[str, dict[str, int]]:
-    response = await client.chat.completions.create(**build_reader_request(args, messages))
+    last_error: Exception | None = None
+    for attempt in range(1, READER_RESPONSE_PARSE_MAX_ATTEMPTS + 1):
+        try:
+            response = await client.chat.completions.create(**build_reader_request(args, messages))
+            break
+        except json.JSONDecodeError as exc:
+            last_error = exc
+            if attempt == READER_RESPONSE_PARSE_MAX_ATTEMPTS:
+                raise
+            await asyncio.sleep(2 ** (attempt - 1))
+    else:
+        raise RuntimeError("reader response parse retry loop exited unexpectedly") from last_error
     text = extract_text_from_response_message(response.choices[0].message)
     require(text != "", "Model returned empty text")
     return text, extract_usage_dict(response)
@@ -1064,6 +1092,7 @@ def main() -> None:
             "agentrunbook_r",
             "codex",
             "agentrunbook_c",
+            "thinharness",
         }:
             require(
                 not memory_workspace_root.exists(),
@@ -1188,7 +1217,8 @@ def main() -> None:
                 supports_nonshared_parallel,
                 (
                     "--prompt-build-max-workers > 1 with non-shared haystacks is only "
-                    "supported for rag, agentrunbook_r, codex, and agentrunbook_c"
+                    "supported for "
+                    f"{', '.join(sorted(NONSHARED_PARALLEL_MEMORY_TYPES))}"
                 ),
             )
         require(not args.save_memory, "--save-memory is only supported when all questions share the same ordered haystack")

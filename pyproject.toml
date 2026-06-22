@@ -12,6 +12,9 @@ dependencies = [
   "numpy",
   "openai",
   "pillow",
+  "thinharness>=0.2.0",
+  "torch>=2.12.0",
+  "torchvision>=0.27.0",
   "tqdm",
   "transformers",
 ]
@@ -27,3 +30,6 @@ packages = ["data", "evaluation", "memory_modules"]
 
 [tool.setuptools.package-data]
 memory_modules = ["assets/agentrunbook_c/INSTRUCTION.md", "assets/agentrunbook_c/scripts/*.py"]
+
+[tool.uv.sources]
+thinharness = { path = "../thinharness", editable = true }
