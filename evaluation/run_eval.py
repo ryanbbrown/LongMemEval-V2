@@ -54,9 +54,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--limit", type=int, default=None, help="Run only the first N selected questions")
     parser.add_argument("--question-ids", nargs="*", default=None, help="Optional question ids, space or comma separated")
-    parser.add_argument("--save-memory", action="store_true", help="Save shared memory state after indexing")
-    parser.add_argument("--skip-evaluation", action="store_true", help="Build and save shared memory, then exit before prompt construction")
-    parser.add_argument("--load-memory-dir", default=None, help="Path to saved memory_state to load instead of rebuilding")
 
     parser.add_argument("--reader-model", default=os.getenv("READER_MODEL", "Qwen/Qwen3.5-9B"))
     parser.add_argument("--reader-base-url", default=os.getenv("READER_BASE_URL", "http://localhost:8023/v1"))
@@ -310,12 +307,6 @@ def main() -> None:
         "--evaluator-max-completion-tokens",
         str(args.evaluator_max_completion_tokens),
     ]
-    if args.save_memory:
-        harness_argv.append("--save-memory")
-    if args.skip_evaluation:
-        harness_argv.append("--skip-evaluation")
-    if args.load_memory_dir is not None:
-        harness_argv.extend(["--load-memory-dir", args.load_memory_dir])
     if not args.reader_enable_thinking:
         harness_argv.append("--reader-disable-thinking")
     if args.shuffle_questions_seed is not None:

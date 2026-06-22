@@ -12,10 +12,6 @@ PYTHON_CMD=(uv run python)
 READER_MODEL_VALUE="${READER_MODEL:-qwen/qwen3.5-9b}"
 READER_BASE_URL_VALUE="${READER_BASE_URL:-https://openrouter.ai/api/v1}"
 READER_API_KEY_ENV_VALUE="${READER_API_KEY_ENV:-OPENROUTER_API_KEY}"
-THINHARNESS_MODEL_VALUE="${THINHARNESS_MODEL:-openai:gpt-5.4-mini}"
-THINHARNESS_API_KEY_ENV_VALUE="${THINHARNESS_API_KEY_ENV:-OPENAI_API_KEY}"
-THINHARNESS_REASONING_EFFORT_VALUE="${THINHARNESS_REASONING_EFFORT:-xhigh}"
-THINHARNESS_TOOL_RETRIES_VALUE="${THINHARNESS_TOOL_RETRIES:-2}"
 MANAGER="$REPO_ROOT/evaluation/scripts/dynamic_full_run_manager.py"
 
 if [ -f "$REPO_ROOT/.env" ]; then
@@ -70,10 +66,14 @@ run_missing_domain() {
       --reader-model "$READER_MODEL_VALUE" \
       --reader-base-url "$READER_BASE_URL_VALUE" \
       --reader-api-key-env "$READER_API_KEY_ENV_VALUE" \
-      --thinharness-model "$THINHARNESS_MODEL_VALUE" \
-      --thinharness-api-key-env "$THINHARNESS_API_KEY_ENV_VALUE" \
-      --thinharness-reasoning-effort "$THINHARNESS_REASONING_EFFORT_VALUE" \
-      --thinharness-tool-retries "$THINHARNESS_TOOL_RETRIES_VALUE" \
+      --thinharness-model "openai:gpt-5.4-mini" \
+      --thinharness-api-key-env "OPENAI_API_KEY" \
+      --thinharness-timeout-seconds "1800" \
+      --thinharness-max-retries "3" \
+      --thinharness-output-retries "1" \
+      --thinharness-tool-retries "2" \
+      --thinharness-reasoning-effort "xhigh" \
+      --thinharness-tools read search jsonl_search list glob \
       --question-ids "$question_id"
   done
 }
