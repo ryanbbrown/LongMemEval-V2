@@ -18,10 +18,14 @@ For the ThinHarness run, I used only its generic built-in filesystem tools (`rea
 
 Across all 127 dynamic questions in the small tier:
 
-| Method | Dynamic score | Non-abstention | Abstention | Memory query time | Memory-agent tokens / usage | Dynamic-subset LAFS |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| AgentRunbook-C rerun | 72.4% (92/127) | 86.0% (74/86) | 43.9% (18/41) | 151.9s avg, 129.1s median | 114.77M input, 1.32M output, 116.09M total | 3.76 |
-| ThinHarness | 74.0% (94/127) | 84.9% (73/86) | 51.2% (21/41) | 99.7s avg, 87.9s median | 60.14M input, 2.10M output, 62.24M total | 9.73 (+5.96) |
+| Metric | AgentRunbook-C rerun | ThinHarness |
+| --- | --- | --- |
+| Dynamic score | 72.4% (92/127) | 74.0% (94/127) |
+| Non-abstention | 86.0% (74/86) | 84.9% (73/86) |
+| Abstention | 43.9% (18/41) | 51.2% (21/41) |
+| Memory query time | 151.9s avg, 129.1s median | 99.7s avg, 87.9s median |
+| Memory-agent tokens / usage | 114.77M input, 1.32M output, 116.09M total | 60.14M input, 2.10M output, 62.24M total |
+| Dynamic-subset LAFS | 3.76 | 9.73 (+5.96) |
 
 
 The 72.4% accuracy for AgentRunbook-C matches the paper, but I would not treat this single consolidated run as a statistically signficant claim that ThinHarness has higher accuracy than AgentRunbook-C--I saw meaningful variance on a portion of the questions when doing targeted reruns. The result does make me reasonably confident that ThinHarness at least matches AgentRunbook-C's performance on this slice, and the published leaderboard reference for vanilla Codex is materially lower than both.
