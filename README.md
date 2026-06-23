@@ -2,9 +2,9 @@
 
 ## Context
 
-I used this fork to test whether ThinHarness is a strong general-purpose agent harness on a nontrivial non-coding task: competitive information retrieval over long trajectory haystacks.
+I used this fork to test whether ThinHarness is a strong general-purpose agent harness on a nontrivial non-coding task: information retrieval over long trajectory haystacks.
 
-I scoped the comparison to the 127 dynamic questions in the small tier: `dynamic-environment` and `dynamic-environment-abs` across the web and enterprise domains. After reviewing the benchmark categories, this subset looked like the best retrieval test for my purposes: given a long history of interaction traces, can the memory layer find the state change, UI behavior, or environment fact needed to answer the question?
+I scoped the comparison to the 127 dynamic questions in the small tier: `dynamic-environment` and `dynamic-environment-abs` across the web and enterprise domains. After reviewing the benchmark categories, this subset looked like the best test for my purposes: given a long history of interaction traces, can the memory layer efficiently and accurately find the state change, UI behavior, or environment fact needed to answer the question?
 
 ## Run Details
 
@@ -18,15 +18,15 @@ For the ThinHarness run, I used only its generic built-in filesystem tools (`rea
 
 Across all 127 dynamic questions in the small tier:
 
-| Method | Dynamic score | Non-abstention | Abstention | Memory query time | Memory-agent tokens / usage |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| AgentRunbook-C rerun | 72.4% (92/127) | 86.0% (74/86) | 43.9% (18/41) | 151.9s avg, 129.1s median | 114.77M input, 1.32M output, 116.09M total |
-| ThinHarness | 74.0% (94/127) | 84.9% (73/86) | 51.2% (21/41) | 99.7s avg, 87.9s median | 60.14M input, 2.10M output, 62.24M total |
+| Method | Dynamic score | Non-abstention | Abstention | Memory query time | Memory-agent tokens / usage | Dynamic-subset LAFS |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| AgentRunbook-C rerun | 72.4% (92/127) | 86.0% (74/86) | 43.9% (18/41) | 151.9s avg, 129.1s median | 114.77M input, 1.32M output, 116.09M total | 3.76 |
+| ThinHarness | 74.0% (94/127) | 84.9% (73/86) | 51.2% (21/41) | 99.7s avg, 87.9s median | 60.14M input, 2.10M output, 62.24M total | 9.73 (+5.96) |
 
 
 The 72.4% accuracy for AgentRunbook-C matches the paper, but I would not treat this single consolidated run as a statistically signficant claim that ThinHarness has higher accuracy than AgentRunbook-C--I saw meaningful variance on a portion of the questions when doing targeted reruns. The result does make me reasonably confident that ThinHarness at least matches AgentRunbook-C's performance on this slice, and the published leaderboard reference for vanilla Codex is materially lower than both.
 
-The memory query time is the harness-measured time around `memory.query(...)`: it includes the query-time memory retrieval agent, but not the downstream reader, scorer, or prior runtime input generation. The timing comparison isn't perfect (local Codex CLI vs. OpenAI API), but the 46.4% lower token usage indicates that 34.4% time savings is probably in the right ballpark. Note that the paper only provides a single aggregate query time figure across all questions, 108.3s, which is far lower than the 151.9s above but includes all questions in the small tier (some of which may have been faster).
+The memory query time is the harness-measured time around `memory.query(...)`: it includes the query-time memory retrieval agent, but not the downstream reader, scorer, or prior runtime input generation. The timing comparison isn't perfect (local Codex CLI vs. OpenAI API), but the 46.4% lower token usage indicates that ~34% time savings is probably in the right ballpark. Note that the paper only provides a single aggregate query time figure across all questions, 108.3s, which is far lower than the 151.9s above but includes all questions in the small tier (some of which may have been faster).
 
 
 # Original README Content
